@@ -10,12 +10,21 @@ import { analytics } from './lib/analytics';
 // Pages
 import HomePage from './pages/Home';
 import ExecutionPage from './pages/Execution';
+import JarvisPage from './pages/Jarvis';
+import CommandPage from './pages/Command';
+import WorkspacePage from './pages/Workspace';
+import AgentsPage from './pages/Agents';
+import MemoryPage from './pages/Memory';
+import BuildPage from './pages/Build';
 
 // Components
 import Sidebar from './components/layout/Sidebar';
+import AtlasSidebar from './components/layout/AtlasSidebar';
 import { TaskLauncher } from './components/TaskLauncher';
 import { useTaskStore } from './stores/taskStore';
 import { Loader2, AlertTriangle } from 'lucide-react';
+
+const ATLAS_ROUTES = ['/command', '/workspace', '/agents', '/memory', '/build'];
 
 type AppStatus = 'loading' | 'ready' | 'error';
 
@@ -95,17 +104,28 @@ export default function App() {
     );
   }
 
+  const isAtlasRoute = ATLAS_ROUTES.some((r) => location.pathname.startsWith(r));
+
   // Ready - render the app with sidebar
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Invisible drag region for window dragging (macOS hiddenInset titlebar) */}
       <div className="drag-region fixed top-0 left-0 right-0 h-10 z-50 pointer-events-none" />
-      <Sidebar />
+      {isAtlasRoute ? <AtlasSidebar /> : <Sidebar />}
       <main className="flex-1 overflow-hidden">
         <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname}>
+            <Route path="/" element={<Navigate to="/command" replace />} />
+            {/* ATLAS screens */}
+            <Route path="/command" element={<CommandPage />} />
+            <Route path="/workspace" element={<WorkspacePage />} />
+            <Route path="/workspace/:taskId" element={<WorkspacePage />} />
+            <Route path="/agents" element={<AgentsPage />} />
+            <Route path="/memory" element={<MemoryPage />} />
+            <Route path="/build" element={<BuildPage />} />
+            {/* Legacy routes */}
             <Route
-              path="/"
+              path="/home"
               element={
                 <motion.div
                   className="h-full"
@@ -134,7 +154,22 @@ export default function App() {
                 </motion.div>
               }
             />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route
+              path="/jarvis"
+              element={
+                <motion.div
+                  className="h-full"
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  variants={variants.fadeUp}
+                  transition={springs.gentle}
+                >
+                  <JarvisPage />
+                </motion.div>
+              }
+            />
+            <Route path="*" element={<Navigate to="/command" replace />} />
           </Routes>
         </AnimatePresence>
       </main>
