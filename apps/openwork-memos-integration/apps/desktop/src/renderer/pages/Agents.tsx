@@ -135,19 +135,20 @@ export default function Agents() {
                     </div>
                   </div>
 
-                  {/* Task count sparkline placeholder */}
+                  {/* Task count sparkline — stable heights seeded by agent id */}
                   <div className="flex items-center gap-2">
                     <div className="flex items-end gap-px h-5">
-                      {Array.from({ length: 7 }).map((_, i) => (
-                        <div
-                          key={i}
-                          className="w-1.5 rounded-sm"
-                          style={{
-                            height: `${Math.max(2, Math.random() * 20)}px`,
-                            backgroundColor: `${def.color}40`,
-                          }}
-                        />
-                      ))}
+                      {Array.from({ length: 7 }).map((_, i) => {
+                        const seed = (def.id.charCodeAt(i % def.id.length) * 13 + i * 7) % 100;
+                        const h = Math.max(2, (seed / 100) * 18);
+                        return (
+                          <div
+                            key={i}
+                            className="w-1.5 rounded-sm"
+                            style={{ height: `${h}px`, backgroundColor: `${def.color}40` }}
+                          />
+                        );
+                      })}
                     </div>
                     <span className="text-[10px] text-white/25 font-mono">{count} task{count !== 1 ? 's' : ''}</span>
                   </div>

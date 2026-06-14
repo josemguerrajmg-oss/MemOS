@@ -30,6 +30,7 @@ export default function Command() {
   const activeTaskIdRef = useRef<string | null>(null);
   const streamIdRef = useRef<number | null>(null);
   const ollamaBaseRef = useRef(OLLAMA_BASE_DEFAULT);
+  const primedRef = useRef(false);
 
   const addLog = useCallback((type: LogLine['type'], text: string) => {
     setLog((prev) => [...prev, mkLog(type, text)]);
@@ -54,6 +55,18 @@ export default function Command() {
       if (cfg?.baseUrl) ollamaBaseRef.current = cfg.baseUrl;
     }).catch(() => {});
   }, [accomplish]);
+
+  // Pick up prompt pre-primed by Build page
+  useEffect(() => {
+    if (primedRef.current) return;
+    const primed = sessionStorage.getItem('atlas_prime_prompt');
+    if (primed) {
+      primedRef.current = true;
+      sessionStorage.removeItem('atlas_prime_prompt');
+      setTimeout(() => runOllamaConversation(primed), 600);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Task update subscription
   useEffect(() => {
