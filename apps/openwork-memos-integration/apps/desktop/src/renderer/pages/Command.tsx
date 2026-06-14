@@ -68,23 +68,11 @@ export default function Command() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Task update subscription
+  // Task update subscription (complete / error events)
   useEffect(() => {
     const unsub = accomplish.onTaskUpdate((ev: TaskUpdateEvent) => {
       if (ev.taskId !== activeTaskIdRef.current) return;
-      if (ev.type === 'message' && ev.message) {
-        const { type, content } = ev.message;
-        if (type === 'assistant') {
-          if (streamIdRef.current === null) {
-            streamIdRef.current = _logId;
-            addLog('assistant', content);
-          } else {
-            appendToLast(content);
-          }
-        } else if (type === 'tool') {
-          addLog('tool', `[${ev.message.toolName ?? 'tool'}] ${content}`);
-        }
-      } else if (ev.type === 'complete') {
+      if (ev.type === 'complete') {
         setIsRunning(false);
         streamIdRef.current = null;
         activeTaskIdRef.current = null;
@@ -92,11 +80,36 @@ export default function Command() {
       } else if (ev.type === 'error') {
         setIsRunning(false);
         streamIdRef.current = null;
-        addLog('error', ev.message?.content ?? 'Task error');
+        addLog('error', (ev as any).message?.content ?? 'Task error');
       }
     });
     return unsub;
-  }, [accomplish, addLog, appendToLast]);
+  }, [accomplish, addLog]);
+
+  // Batched message subscription (assistant / tool messages)
+  useEffect(() => {
+    if (!accomplish.onTaskUpdateBatch) return;
+    const unsub = accomplish.onTaskUpdateBatch((batch: { taskId: string; messages: any[] }) => {
+      if (batch.taskId !== activeTaskIdRef.current) return;
+      for (const msg of batch.messages) {
+        if (msg.type === 'assistant') {
+          const content: string = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+          setLog((prev) => {
+            const last = prev[prev.length - 1];
+            if (last && last.type === 'assistant') {
+              const updated = [...prev];
+              updated[updated.length - 1] = { ...last, text: last.text + content };
+              return updated;
+            }
+            return [...prev, mkLog('assistant', content)];
+          });
+        } else if (msg.type === 'tool') {
+          addLog('tool', `[${msg.toolName ?? 'tool'}] ${typeof msg.content === 'string' ? msg.content : ''}`);
+        }
+      }
+    });
+    return unsub;
+  }, [accomplish, addLog]);
 
   // Permission subscription
   useEffect(() => {
@@ -108,7 +121,7 @@ export default function Command() {
   }, [accomplish, addLog]);
 
   const approvePermission = (req: PermissionReq, allow: boolean) => {
-    accomplish.respondToPermission({ id: req.id, taskId: req.taskId, approved: allow });
+    accomplish.respondToPermission({ taskId: req.taskId, allowed: allow });
     setPermissions((prev) => prev.filter((p) => p.id !== req.id));
     addLog('system', `Permission ${allow ? 'granted' : 'denied'}: ${req.description}`);
   };

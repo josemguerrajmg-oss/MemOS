@@ -32,20 +32,29 @@ export default function Workspace() {
   useEffect(() => {
     const unsub = accomplish.onTaskUpdate((ev: TaskUpdateEvent) => {
       if (taskId && ev.taskId !== taskId) return;
-      if (ev.type === 'message' && ev.message) {
-        const { type, content } = ev.message;
-        if (type === 'assistant') {
-          // Extract code blocks
+      if (ev.type === 'complete') {
+        setLog((prev) => [...prev, mk('system', '─── complete ───')]);
+      } else if (ev.type === 'error') {
+        setLog((prev) => [...prev, mk('error', (ev as any).message?.content ?? 'error')]);
+      }
+    });
+    return unsub;
+  }, [accomplish, taskId]);
+
+  // Batched messages (assistant / tool)
+  useEffect(() => {
+    if (!accomplish.onTaskUpdateBatch) return;
+    const unsub = accomplish.onTaskUpdateBatch((batch: { taskId: string; messages: any[] }) => {
+      if (taskId && batch.taskId !== taskId) return;
+      for (const msg of batch.messages) {
+        if (msg.type === 'assistant') {
+          const content: string = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
           const codeMatch = content.match(/```(?:\w+)?\n?([\s\S]*?)```/);
           if (codeMatch) setCode((prev) => prev + '\n' + codeMatch[1]);
           setLog((prev) => [...prev, mk('assistant', content)]);
-        } else if (type === 'tool') {
-          setLog((prev) => [...prev, mk('tool', `[${ev.message!.toolName ?? 'tool'}] ${content}`)]);
+        } else if (msg.type === 'tool') {
+          setLog((prev) => [...prev, mk('tool', `[${msg.toolName ?? 'tool'}] ${typeof msg.content === 'string' ? msg.content : ''}`)]);
         }
-      } else if (ev.type === 'complete') {
-        setLog((prev) => [...prev, mk('system', '─── complete ───')]);
-      } else if (ev.type === 'error') {
-        setLog((prev) => [...prev, mk('error', ev.message?.content ?? 'error')]);
       }
     });
     return unsub;
