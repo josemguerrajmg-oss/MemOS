@@ -16,6 +16,15 @@ const AGENTS: AgentCard[] = [
   { id: 'engineering', icon: '⚙', name: 'Engineering', description: 'Infra & automation', color: '#fbbf24' },
 ];
 
+const AGENT_PROMPTS: Record<string, string> = {
+  research: 'You are a Research specialist. Search the web, summarize findings, and produce a concise research report on any topic the user names. Start by asking: what topic should I research?',
+  marketing: 'You are a Marketing specialist. Draft compelling marketing copy, campaign ideas, or social posts. Start by asking: what product or campaign should I write about?',
+  coding: 'You are a Coding specialist. Write production-ready code, review existing code, or fix bugs. Start by asking: what would you like me to build or review?',
+  design: 'You are a Design specialist. Describe UI layouts, generate design briefs, or write CSS/Tailwind components. Start by asking: what interface or component should I design?',
+  sales: 'You are a Sales specialist. Write outreach emails, sales scripts, or analyze pipeline. Start by asking: what prospect or deal should I help with?',
+  engineering: 'You are an Engineering specialist. Design system architecture, write infrastructure code, or debug technical problems. Start by asking: what engineering problem should I tackle?',
+};
+
 let _logId = 0;
 const mkLog = (type: LogLine['type'], text: string): LogLine => ({ id: _logId++, type, text, ts: Date.now() });
 
@@ -164,11 +173,11 @@ export default function Command() {
   const spawnAgentTask = async (agentId: string, customPrompt?: string) => {
     const agent = AGENTS.find((a) => a.id === agentId);
     if (!agent || isRunning) return;
-    const taskPrompt = customPrompt || `Act as a ${agent.name} specialist. Assist with ${agent.description.toLowerCase()}. Await my follow-up instructions.`;
+    const taskPrompt = customPrompt ?? AGENT_PROMPTS[agentId] ?? `You are a ${agent.name} specialist. ${agent.description}.`;
     setIsRunning(true);
     setActiveAgent(agentId);
     streamIdRef.current = null;
-    addLog('system', `─── Spawning ${agent.name} agent ───`);
+    addLog('system', `─── ${agent.name} agent running ───`);
     try {
       const result = await accomplish.startTask({ prompt: taskPrompt });
       activeTaskIdRef.current = result?.id ?? result?.taskId ?? null;
@@ -179,24 +188,14 @@ export default function Command() {
     }
   };
 
+  // Command bar always routes to Ollama (conversational).
+  // Agent cards are the entry point for OpenCode tasks.
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const input = prompt.trim();
     if (!input) return;
     setPrompt('');
-
-    if (isRunning && activeTaskIdRef.current) {
-      // Send as follow-up via a new task start
-      addLog('user', input);
-      streamIdRef.current = null;
-      try {
-        const result = await accomplish.startTask({ prompt: input });
-        activeTaskIdRef.current = result?.id ?? result?.taskId ?? null;
-      } catch (err) { addLog('error', (err as Error).message); }
-    } else {
-      // Conversational — route to Ollama
-      await runOllamaConversation(input);
-    }
+    await runOllamaConversation(input);
   };
 
   const logTypeStyle: Record<LogLine['type'], string> = {
@@ -252,10 +251,16 @@ export default function Command() {
         {isRunning && (
           <div className="border-t border-white/5 px-4 py-3">
             <button
-              onClick={() => { accomplish.cancelTask(activeTaskIdRef.current); setIsRunning(false); setActiveAgent(null); }}
+              onClick={() => {
+                accomplish.cancelTask(activeTaskIdRef.current);
+                setIsRunning(false);
+                setActiveAgent(null);
+                activeTaskIdRef.current = null;
+                addLog('system', '─── Task cancelled ───');
+              }}
               className="w-full rounded-lg bg-red-900/30 py-1.5 text-xs text-red-400 hover:bg-red-900/50 transition-colors"
             >
-              Stop task
+              Cancel task
             </button>
           </div>
         )}
@@ -324,7 +329,7 @@ export default function Command() {
           <input
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder={isRunning ? 'Send follow-up to agent…' : 'Command ATLAS or spawn an agent…'}
+            placeholder="Ask ATLAS anything — use agent cards to run tasks…"
             className="flex-1 bg-transparent text-sm text-white/80 placeholder-white/20 outline-none font-mono"
           />
           <button
