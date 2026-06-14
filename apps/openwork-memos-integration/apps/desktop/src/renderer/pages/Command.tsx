@@ -119,7 +119,11 @@ export default function Command() {
             return [...prev, mkLog('assistant', content)];
           });
         } else if (msg.type === 'tool') {
-          addLog('tool', `[${msg.toolName ?? 'tool'}] ${typeof msg.content === 'string' ? msg.content : ''}`);
+          const raw = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+          // Summarise tool calls — skip verbose JSON blobs
+          const toolLabel = msg.toolName ?? 'tool';
+          const summary = raw.length > 120 ? `${raw.slice(0, 120)}…` : raw;
+          addLog('tool', `[${toolLabel}] ${summary}`);
         }
       }
     });
@@ -148,25 +152,18 @@ export default function Command() {
     streamIdRef.current = streamLog.id;
     try {
       const model = await resolveOllamaModel(ollamaBaseRef.current);
+      let got = false;
       for await (const token of streamOllamaResponse(input, ollamaBaseRef.current, model)) {
         appendToLast(token);
+        got = true;
       }
+      if (!got) appendToLast('(no response)');
       streamIdRef.current = null;
-    } catch {
-      // Ollama unavailable — fall back to OpenCode task
-      setLog((prev) => prev.filter((l) => l.id !== streamLog.id)); // remove empty entry
+    } catch (err) {
+      const msg = (err as Error).message;
+      setLog((prev) => prev.filter((l) => l.id !== streamLog.id));
       streamIdRef.current = null;
-      addLog('system', '─── Ollama offline — spawning as agent task ───');
-      setIsRunning(true);
-      setActiveAgent('__inline__');
-      try {
-        const result = await accomplish.startTask({ prompt: input });
-        activeTaskIdRef.current = result?.id ?? result?.taskId ?? null;
-      } catch (err) {
-        addLog('error', `Task failed: ${(err as Error).message}`);
-        setIsRunning(false);
-        setActiveAgent(null);
-      }
+      addLog('error', `Ollama unavailable (${msg}). Start Ollama or use an agent card to run a task.`);
     }
   };
 

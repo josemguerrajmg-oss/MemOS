@@ -30,8 +30,8 @@ export function isChatModel(m: OllamaTag): boolean {
 
 export async function resolveOllamaModel(base = OLLAMA_BASE_DEFAULT): Promise<string> {
   let res: Response;
-  try { res = await fetch(`${base}/api/tags`); } catch { throw new Error('ollama_down'); }
-  if (!res.ok) throw new Error('ollama_down');
+  try { res = await fetch(`${base}/api/tags`); } catch (e) { throw new Error(`ollama_down: ${(e as Error).message}`); }
+  if (!res.ok) throw new Error(`ollama_http_${res.status}`);
   const data = await res.json();
   const chat = ((data.models ?? []) as OllamaTag[]).filter(isChatModel);
   if (!chat.length) throw new Error('ollama_no_models');
@@ -66,7 +66,7 @@ export async function* streamOllamaResponse(
         stream: true,
       }),
     });
-  } catch { throw new Error('ollama_down'); }
+  } catch (e) { throw new Error(`ollama_chat_down: ${(e as Error).message}`); }
   if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
   const reader = res.body.getReader();
   const dec = new TextDecoder();
