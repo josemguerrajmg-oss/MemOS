@@ -31,6 +31,12 @@ export default function Command() {
   const streamIdRef = useRef<number | null>(null);
   const ollamaBaseRef = useRef(OLLAMA_BASE_DEFAULT);
   const primedRef = useRef(false);
+  const [clock, setClock] = useState(() => new Date().toLocaleTimeString('en', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+
+  useEffect(() => {
+    const t = setInterval(() => setClock(new Date().toLocaleTimeString('en', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   const addLog = useCallback((type: LogLine['type'], text: string) => {
     setLog((prev) => [...prev, mkLog(type, text)]);
@@ -136,10 +142,22 @@ export default function Command() {
       for await (const token of streamOllamaResponse(input, ollamaBaseRef.current, model)) {
         appendToLast(token);
       }
-    } catch {
-      appendToLast('[Ollama unavailable — start a task via an agent card instead]');
-    } finally {
       streamIdRef.current = null;
+    } catch {
+      // Ollama unavailable — fall back to OpenCode task
+      setLog((prev) => prev.filter((l) => l.id !== streamLog.id)); // remove empty entry
+      streamIdRef.current = null;
+      addLog('system', '─── Ollama offline — spawning as agent task ───');
+      setIsRunning(true);
+      setActiveAgent('__inline__');
+      try {
+        const result = await accomplish.startTask({ prompt: input });
+        activeTaskIdRef.current = result?.id ?? result?.taskId ?? null;
+      } catch (err) {
+        addLog('error', `Task failed: ${(err as Error).message}`);
+        setIsRunning(false);
+        setActiveAgent(null);
+      }
     }
   };
 
@@ -255,7 +273,7 @@ export default function Command() {
           </div>
           <div className="flex items-center gap-2">
             {isRunning && <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />}
-            <span className="text-[10px] font-mono text-white/25">{new Date().toLocaleTimeString()}</span>
+            <span className="text-[10px] font-mono text-white/25">{clock}</span>
           </div>
         </div>
 
