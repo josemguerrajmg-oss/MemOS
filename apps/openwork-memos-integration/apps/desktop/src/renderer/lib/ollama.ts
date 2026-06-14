@@ -6,7 +6,7 @@ export const OLLAMA_BASE_DEFAULT = 'http://localhost:11434';
 
 export const OLLAMA_PREFERRED = [
   'qwen2.5', 'qwen2', 'llama3.3', 'llama3.2', 'llama3.1', 'llama3',
-  'mistral', 'phi4', 'phi3.5', 'phi3', 'gemma3', 'gemma2', 'gemma', 'mixtral', 'qwen',
+  'mistral', 'phi4', 'phi3.5', 'phi3', 'gemma4', 'gemma3', 'gemma2', 'gemma', 'mixtral', 'qwen',
 ];
 
 export const OLLAMA_CHAT_SYSTEM =
